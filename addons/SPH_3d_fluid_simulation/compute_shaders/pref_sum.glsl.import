@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://b7u0trucvfk1p"
+path="res://.godot/imported/pref_sum.glsl-7a082c1270c055f9955a3aa294407de1.res"
+
+[deps]
+
+source_file="res://fluid_sim_addon/addons/SPH_3d_fluid_simulation/compute_shaders/pref_sum.glsl"
+dest_files=["res://.godot/imported/pref_sum.glsl-7a082c1270c055f9955a3aa294407de1.res"]
+
+[params]
+
