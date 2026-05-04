@@ -41,51 +41,21 @@ var height = 2.0:
 		height = val
 		set_multimesh_aabb()
 
-@export
-var box_scale = 8.0
-
-var output_tex_uniform :RDUniform
-var output_tex := RID()
-#var fmt := RDTextureFormat.new() 
-
-var view := RDTextureView.new()
 
 var positions: PackedVector4Array = []
-var shader :RID
 var pipeline :RID
-var sum_shader: RID
 var sum_pipeline: RID
 var uniform_set :RID
 var first_step_sum_uniform_set: RID
 var second_step_sum_uniform_set: RID
-
-var positions_buffer: RID
-var predicated_positions_buffer: RID
-var velocity_buffer: RID
-var density_buffer: RID
-var hash_count_buffer: RID
-var pref_sum_hash_count_buffer: RID
-var pref_sum_hash_count_buffer2: RID
-var hash_indexes_buffer: RID
-var force_buffer: RID
-
-var positions_uniform :RDUniform
-var predicated_positions_uniform :RDUniform
-var velocity_uniform :RDUniform
-var density_uniform :RDUniform
-var hash_count_uniform :RDUniform
-var pref_sum_hash_count_uniform :RDUniform
-var pref_sum_hash_count_uniform2 :RDUniform
-var hash_indexes_uniform :RDUniform
-var in_hash_pref_uniform: RDUniform
-var out_has_pref_uniform: RDUniform
-var force_buffer_uniform: RDUniform
 
 var gravity: float = 0.4
 var default_density: float = 10000
 var pressure_multiply: float = 2
 var damping: float = 0.3
 var rows = 20
+
+#not used
 var mass: float = 100:
 	set(val):
 		mass = val
@@ -131,7 +101,7 @@ func set_particles():
 	positions.clear()
 	var diameter = 2 * radius + spacing
 	for i in range(count):
-		positions.append(Vector4(randf() * length , height - randf() * 0.1, randf() * width, 0))
+		positions.append(Vector4(0.3 * randf() * length , height - randf() * 0.7, randf() * width, 0))
 	rebuild_buffers()
 
 func params_to_byte_array(params):
@@ -391,19 +361,19 @@ func rebuild_buffers():
 	# load and begin compiling compute shader
 	var shader_file :RDShaderFile= load("uid://blbluf43jc54l")
 	var shader_spirv :RDShaderSPIRV= shader_file.get_spirv()
-	shader = rd.shader_create_from_spirv(shader_spirv)
+	var shader = rd.shader_create_from_spirv(shader_spirv)
 	pipeline = rd.compute_pipeline_create(shader)
 	
 	var pref_sum: RDShaderFile = load("uid://b7u0trucvfk1p")
 	var shader_pref_spirv: RDShaderSPIRV = pref_sum.get_spirv()
-	sum_shader = rd.shader_create_from_spirv(shader_pref_spirv)
+	var sum_shader = rd.shader_create_from_spirv(shader_pref_spirv)
 	sum_pipeline = rd.compute_pipeline_create(sum_shader)
 	#var arr: PackedInt32Array
 	#for i in range(hash_oversizing * positions.size()):
 		#arr.append(i)
 
-	pref_sum_hash_count_buffer = rd.storage_buffer_create(int_size * hash_oversizing * positions.size())
-	pref_sum_hash_count_buffer2 = rd.storage_buffer_create(int_size * hash_oversizing * positions.size())
+	var pref_sum_hash_count_buffer = rd.storage_buffer_create(int_size * hash_oversizing * positions.size())
+	var pref_sum_hash_count_buffer2 = rd.storage_buffer_create(int_size * hash_oversizing * positions.size())
 	
 	var unif1 := get_buffer_uniform(0, pref_sum_hash_count_buffer)
 	var unif2 := get_buffer_uniform(1, pref_sum_hash_count_buffer2)
@@ -414,22 +384,15 @@ func rebuild_buffers():
 	second_step_sum_uniform_set = rd.uniform_set_create([unif1, unif2], sum_shader, 0)
 	#print(positions)
 	var data = positions.to_byte_array()
-	positions_buffer = rd.storage_buffer_create(data.size(), data)
-	predicated_positions_buffer = rd.storage_buffer_create(data.size())
-	velocity_buffer = rd.storage_buffer_create(data.size())
-	density_buffer = rd.storage_buffer_create(int_size * positions.size())
-	hash_count_buffer = rd.storage_buffer_create(int_size * hash_oversizing * positions.size())
-	hash_indexes_buffer = rd.storage_buffer_create(int_size * positions.size())
-	force_buffer = rd.storage_buffer_create(data.size())
+	var positions_buffer = rd.storage_buffer_create(data.size(), data)
+	var predicated_positions_buffer = rd.storage_buffer_create(data.size())
+	var velocity_buffer = rd.storage_buffer_create(data.size())
+	var density_buffer = rd.storage_buffer_create(int_size * positions.size())
+	var hash_count_buffer = rd.storage_buffer_create(int_size * hash_oversizing * positions.size())
+	var hash_indexes_buffer = rd.storage_buffer_create(int_size * positions.size())
+	var force_buffer = rd.storage_buffer_create(data.size())
 	
-	#var output_image := Image.create(img_size_x, img_size_y, false, Image.FORMAT_RGBAF)
-	#var image_texture := ImageTexture.create_from_image(output_image)
-	#%TextureRect.texture = image_texture
-	#output_tex = rd.texture_create(fmt, view)
-	
-	#var texture := Texture2DRD.new()
-	#texture.texture_rd_rid = output_tex
-	#%TextureRect.texture = texture
+
 	var sampler_state := RDSamplerState.new()
 	sampler_state.mag_filter = RenderingDevice.SAMPLER_FILTER_LINEAR
 	sampler_state.min_filter = RenderingDevice.SAMPLER_FILTER_LINEAR
@@ -446,21 +409,17 @@ func rebuild_buffers():
 	sdf_uniform.add_id(sampler_rid)
 	sdf_uniform.add_id(RenderingServer.texture_get_rd_texture(%GPUParticlesCollisionSDF3D.texture.get_rid()))
 	
-	positions_uniform                = get_buffer_uniform(0, positions_buffer)
-	predicated_positions_uniform     = get_buffer_uniform(1, predicated_positions_buffer)
-	velocity_uniform                 = get_buffer_uniform(2, velocity_buffer)
-	density_uniform                  = get_buffer_uniform(3, density_buffer)
-	hash_count_uniform               = get_buffer_uniform(4, hash_count_buffer)
-	pref_sum_hash_count_uniform      = get_buffer_uniform(5, pref_sum_hash_count_buffer)
-	hash_indexes_uniform             = get_buffer_uniform(6, hash_indexes_buffer)
-	pref_sum_hash_count_uniform2      = get_buffer_uniform(7, pref_sum_hash_count_buffer2)
-	force_buffer_uniform = get_buffer_uniform(9, force_buffer)
+	var positions_uniform = get_buffer_uniform(0, positions_buffer)
+	var predicated_positions_uniform = get_buffer_uniform(1, predicated_positions_buffer)
+	var velocity_uniform = get_buffer_uniform(2, velocity_buffer)
+	var density_uniform = get_buffer_uniform(3, density_buffer)
+	var hash_count_uniform  = get_buffer_uniform(4, hash_count_buffer)
+	var pref_sum_hash_count_uniform = get_buffer_uniform(5, pref_sum_hash_count_buffer)
+	var hash_indexes_uniform = get_buffer_uniform(6, hash_indexes_buffer)
+	var pref_sum_hash_count_uniform2 = get_buffer_uniform(7, pref_sum_hash_count_buffer2)
+	var force_buffer_uniform = get_buffer_uniform(9, force_buffer)
 	var mm_uniform = get_buffer_uniform(10, mm_rid)
-	
-	#output_tex_uniform = RDUniform.new()
-	#output_tex_uniform.uniform_type = RenderingDevice.UNIFORM_TYPE_IMAGE
-	#output_tex_uniform.binding = 8
-	#output_tex_uniform.add_id(output_tex)
+
 	
 	if profiler_mode:
 		var dummy_mm_buffer = rd.storage_buffer_create(count * 128) # Примерный размер
@@ -492,7 +451,6 @@ func rebuild_buffers():
 	hash_count_uniform, 
 	pref_sum_hash_count_uniform, 
 	hash_indexes_uniform, 
-	#output_tex_uniform, 
 	pref_sum_hash_count_uniform2, 
 	force_buffer_uniform,
 	mm_uniform,
